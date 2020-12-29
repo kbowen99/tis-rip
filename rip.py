@@ -9,6 +9,8 @@ from bs4 import BeautifulSoup
 import os
 import sys
 
+# The chrome application path is pretty platform/install specific..
+CHROME_PATH = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
 
 def mkfilename(s):
     fn = ""
@@ -21,7 +23,8 @@ def mkfilename(s):
 
 def fix_links(fn):
     modified = False
-    doc = open(fn, 'r').read()
+    # Specify the new encoding
+    doc = open(fn, 'r', encoding='utf-8').read()
     soup = BeautifulSoup(doc, 'lxml')
     for link in soup.find_all("a"):
         href = link.get('href')
@@ -41,7 +44,8 @@ def fix_links(fn):
     
     if modified:
         print("Writing ", fn)
-        with open(fn, 'w') as fh:
+        # Specify encoding again
+        with open(fn, 'w', encoding='utf-8') as fh:
             fh.write(soup.prettify())
 
 def download_ewd(driver, ewd):
@@ -91,7 +95,7 @@ def download_ewd(driver, ewd):
                 print("Didn't download ", url, "!")
                 continue
             shutil.move(dl_path, fn)
-            print("Done ", name)
+            print("\tDone ", name)
 
 def toc_parse_items(base, items):
     if len(items) == 0:
@@ -131,7 +135,8 @@ def build_toc_index(base):
 
     print("Building TOC index from ", toc_path, "...")
     
-    tree = ET.parse(toc_path)
+    # Yet again, specifying the encoding so this actually works
+    tree = ET.parse(toc_path, parser = ET.XMLParser(encoding = 'iso-8859-5'))
     root = tree.getroot()
 
     body = toc_parse_items(base, root.findall("item"))
@@ -155,8 +160,9 @@ def download_manual(driver, t, id):
         xml_src = driver.execute_script('return document.getElementById("webkit-xml-viewer-source-xml").innerHTML')
         with open(toc_path, 'w') as fh:
             fh.write(xml_src)
-
-    tree = ET.parse(toc_path)
+    
+    # The Element tree parser will fail without specifying the encoding, iso-8859-5 seems to play nicely with all the \omegas and such
+    tree = ET.parse(toc_path, parser = ET.XMLParser(encoding = 'iso-8859-5'))
     root = tree.getroot()
     n = 0
     c = 0
@@ -236,7 +242,8 @@ def download_manual(driver, t, id):
                 time.sleep(1)
                 src = driver.execute_script(open("injected.js", "r").read())
 
-            with open(f_p, 'w') as fh:
+            # Encode the output files with utf-8
+            with open(f_p, 'w', encoding='utf-8') as fh:
                 fh.write(src)
 
             fix_links(f_p)
@@ -247,7 +254,8 @@ def download_manual(driver, t, id):
 
 def make_pdf(src, dest):
     print("Creating PDF from", src, "to", dest)
-    subprocess.run(["/usr/bin/chromium", "--print-to-pdf=" + dest, "--no-gpu", "--headless", "file://" + os.path.abspath(src)])
+    # Use some form of variable for the path, and use abspath for both source & destination (otherwise this will break if chrome is on a different drive)
+    subprocess.run([CHROME_PATH, "--print-to-pdf=" + os.path.abspath(dest), "--no-gpu", "--headless", "file://" + os.path.abspath(src)])
 
 
 if __name__ == "__main__":
